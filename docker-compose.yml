@@ -1,0 +1,66 @@
+services:
+  chat-production:
+    container_name: chat-production
+    build:
+      target: production
+      context: .
+      args:
+        - PORT=${PORT:-3002}
+    ports:
+      - "${PORT:-3002}:${PORT:-3002}"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: "512m"
+        reservations:
+          cpus: "0.25"
+          memory: "256m"
+
+  template-dev:
+    container_name: template-dev
+    restart: unless-stopped
+    env_file: .env
+    build:
+      target: dev
+      context: .
+      args:
+        - PORT=${PORT:-3002}
+    ports:
+      - "${PORT:-3002}:${PORT:-3002}"
+      - "9229:9229"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules/
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: "512m"
+        reservations:
+          cpus: "0.25"
+          memory: "256m"
+
+  k6:
+    image: ghcr.io/grafana/xk6-dashboard:0.7.2
+    container_name: k6
+    volumes:
+      - ./tests/performance:/tests/performance
+      - ./k6-results:/home/k6
+    ports:
+      - "5665:5665"
+    environment:
+      BASE_URL: "http://host.docker.internal:3002"
+      K6_WEB_DASHBOARD_EXPORT: "report.html"
+      K6_WEB_DASHBOARD_PERIOD: "1s"
+      K6_WEB_DASHBOARD_OPEN: "true"
+    command:
+      [
+        "run",
+        "--out",
+        "web-dashboard",
+        "/tests/performance/contexts/users/get-users.js",
+      ]
+
+volumes:
+  node_modules:
